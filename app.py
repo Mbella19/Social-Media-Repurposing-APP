@@ -915,9 +915,13 @@ def format_video_with_letterbox(input_path, output_path, resolution):
 def format_video_clip(input_path, output_path, aspect_ratio, resolution, use_letterbox=False):
     """Format video clip with specified aspect ratio and resolution"""
 
+    # Try letterbox first, but fall back to standard crop if FFmpeg fails
     if use_letterbox and aspect_ratio == "9:16":
         logger.info(f"📹 Using AI-recommended LETTERBOX mode for {aspect_ratio}")
-        return format_video_with_letterbox(input_path, output_path, resolution)
+        if format_video_with_letterbox(input_path, output_path, resolution):
+            return True
+        logger.warning("Letterbox formatting failed; falling back to standard crop.")
+        use_letterbox = False  # Continue to standard path
 
     # Prefer smart cropping for vertical clips when AI stays in standard mode
     if (
@@ -1481,7 +1485,7 @@ def process_video_background(session_id, video_url, url_type, clip_duration, num
                 os.remove(temp_video_path)
             
             logger.info("=" * 60)
-        
+
         # Create ZIP of all clips
         if clips_info:
             zip_path = os.path.join(session_folder, 'all_clips.zip')
@@ -1492,7 +1496,17 @@ def process_video_background(session_id, video_url, url_type, clip_duration, num
                         zipf.write(clip_path, clip['filename'])
                         logger.info(f"Added {clip['filename']} to ZIP")
             logger.info(f"Created ZIP file: {zip_path}")
-        
+
+        # No clips generated → surface error so UI doesn't show an empty Studio
+        if not clips_info:
+            processing_sessions[session_id] = {
+                'status': 'error',
+                'error': 'Clip formatting failed (see FFmpeg logs). No clips generated.',
+                'session_id': session_id
+            }
+            logger.error("Processing finished with zero clips; returning error status.")
+            return
+
         # Update session status to completed
         processing_sessions[session_id] = {
             'status': 'completed',
@@ -1655,20 +1669,21 @@ def generate_captions(session_id, filename):
         # Transcribe video
         result = whisper_service.transcribe_video(video_path, language)
         
-        if result:
-            # Save captions to file
-            captions_file = os.path.join(session_folder, f"{filename}.captions.json")
-            with open(captions_file, 'w') as f:
-                json.dump(result, f)
-            
-            return jsonify({
-                'success': True,
-                'captions': result['captions'],
-                'fullText': result['full_text'],
-                'language': result['language']
-            })
-        else:
-            return jsonify({'error': 'Caption generation failed'}), 500
+        if not result or 'error' in result:
+            error_msg = result.get('error') if isinstance(result, dict) else 'Caption generation failed'
+            return jsonify({'error': error_msg}), 500
+
+        # Save captions to file
+        captions_file = os.path.join(session_folder, f"{filename}.captions.json")
+        with open(captions_file, 'w') as f:
+            json.dump(result, f)
+        
+        return jsonify({
+            'success': True,
+            'captions': result['captions'],
+            'fullText': result['full_text'],
+            'language': result['language']
+        })
             
     except Exception as e:
         logger.error(f"Caption generation error: {e}")

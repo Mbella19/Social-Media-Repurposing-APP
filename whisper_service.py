@@ -38,6 +38,9 @@ class WhisperService:
     def transcribe_video(self, video_path, language="en"):
         """Transcribe video to generate captions with precise timestamps"""
         try:
+            if not self.api_key:
+                return {"error": "DEEPGRAM_API_KEY is not set. Please add it to your environment."}
+
             logger.info(f"🎬 Starting Deepgram Nova-3 transcription for: {video_path}")
             
             # Get video duration
@@ -78,7 +81,7 @@ class WhisperService:
             
             if response.status_code != 200:
                 logger.error(f"Deepgram API error: {response.status_code} - {response.text}")
-                return None
+                return {"error": f"Deepgram API error {response.status_code}: {response.text}"}
             
             # Parse JSON response
             result = response.json()
@@ -159,7 +162,7 @@ class WhisperService:
             logger.error(f"Deepgram transcription failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return None
+            return {"error": str(e)}
     
     def generate_srt(self, captions):
         """Generate SRT subtitle file content from captions"""

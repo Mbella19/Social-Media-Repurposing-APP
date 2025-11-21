@@ -164,10 +164,18 @@ export default function StudioPage() {
 
   const togglePlay = () => {
     if (videoRef.current) {
+      const video = videoRef.current;
+      // If at or past end, restart from beginning before playing
+      const durationLimit = getActiveDuration(selectedClip);
+      if (durationLimit && video.currentTime >= durationLimit - 0.05) {
+        video.currentTime = 0;
+        setCurrentTime(0);
+      }
+
       if (isPlaying) {
-        videoRef.current.pause();
+        video.pause();
       } else {
-        videoRef.current.play();
+        video.play().catch(() => {});
       }
       setIsPlaying(!isPlaying);
     }
@@ -182,6 +190,29 @@ export default function StudioPage() {
     }
     setCurrentTime(safeTarget);
   };
+
+  // Keep isPlaying in sync with actual video events (prevents stuck pause/play states)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(getActiveDuration(selectedClip));
+    };
+
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+    video.addEventListener("ended", handleEnded);
+
+    return () => {
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+      video.removeEventListener("ended", handleEnded);
+    };
+  }, [selectedClip]);
 
   const handleToggleLetterbox = async () => {
     if (!selectedClip || !sessionId) return;
@@ -437,7 +468,7 @@ export default function StudioPage() {
           <div className="h-full bg-zinc-950 flex flex-col relative">
             {/* Video Preview Area */}
             <div className="flex-1 flex items-center justify-center p-8 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900/20 to-zinc-950 overflow-hidden">
-              <div className="aspect-[9/16] h-full max-h-[60vh] bg-black border border-zinc-900 shadow-2xl relative group">
+              <div className="aspect-[9/16] h-full max-h-[48vh] bg-black border border-zinc-900 shadow-2xl relative group">
                 {selectedClip ? (
                   <video
                     ref={videoRef}
@@ -474,7 +505,7 @@ export default function StudioPage() {
             </div>
 
             {/* Timeline Area */}
-            <div className="h-48 border-t border-zinc-900 bg-zinc-950 p-4 flex flex-col gap-2">
+            <div className="min-h-[240px] max-h-[340px] border-t border-zinc-900 bg-zinc-950 p-4 flex flex-col gap-2 overflow-hidden">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Button
