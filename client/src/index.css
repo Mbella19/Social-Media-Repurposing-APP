@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 5.9% 10%;
+    /* Zinc 950 #09090b */
+    --foreground: 0 0% 100%;
+    /* White */
+
+    --card: 240 5.9% 10%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 240 5.9% 10%;
+    --popover-foreground: 0 0% 100%;
+
+    --primary: 188 86% 53%;
+    /* Cyan 400 #22d3ee */
+    --primary-foreground: 0 0% 0%;
+    /* Black */
+
+    --secondary: 240 5.9% 10%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 3.7% 15.9%;
+    /* Zinc 900 */
+    --muted-foreground: 240 5% 64.9%;
+    /* Zinc 500 */
+
+    --accent: 188 86% 53%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    /* Zinc 900 */
+    --input: 240 3.7% 15.9%;
+    --ring: 188 86% 53%;
+
+    --radius: 0px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-cyan-400 selection:text-black;
+  }
+
+  /* Typography Overrides */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-black tracking-tighter;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-zinc-950;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-800 hover:bg-cyan-400 transition-colors;
+  }
+}
+
+/* Animation Utilities */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

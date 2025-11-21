@@ -1,0 +1,13 @@
+/Users/gervaciusjr/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/gervaciusjr/Library/Python/3.9/lib/python/site-packages/pydantic/_internal/_generate_schema.py:628: UserWarning: <built-in function any> is not a Python type (it may be an instance of an object), Pydantic will allow any object with no validation since we cannot even enforce that the input is an instance of the given type. To get rid of this error wrap the type with `pydantic.SkipValidation`.
+  warn(
+INFO:smart_crop:Using Haar Cascade detector (DNN not available)
+INFO:__main__:✓ Smart cropping module loaded (face tracking enabled)
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Added job "cleanup_old_files" to job store "default"
+INFO:apscheduler.scheduler:Scheduler started
+ * Serving Flask app 'app'
+ * Debug mode: on
+Address already in use
+Port 5555 is in use by another program. Either identify and stop that program, or start the server with a different port.

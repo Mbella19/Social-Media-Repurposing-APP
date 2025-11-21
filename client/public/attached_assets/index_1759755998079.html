@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipCraft - AI Video Repurposing Tool</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-video"></i>
+                <h1>ClipCraft</h1>
+            </div>
+            <p class="tagline">Transform long videos into viral-worthy shorts with AI</p>
+            <div id="smart-crop-badge" style="display: none; margin-top: 10px;">
+                <span style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px;">
+                    <i class="fas fa-magic"></i> Advanced AI Tracking - Smooth Motion + Multi-Face Letterbox
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section card">
+                <h2><i class="fas fa-upload"></i> Step 1: Choose Your Video</h2>
+                
+                <!-- Source Type Toggle -->
+                <div class="source-toggle">
+                    <button class="toggle-btn active" data-source="youtube">
+                        <i class="fab fa-youtube"></i> YouTube URL
+                    </button>
+                    <button class="toggle-btn" data-source="upload">
+                        <i class="fas fa-file-upload"></i> Upload File
+                    </button>
+                </div>
+
+                <!-- YouTube Input -->
+                <div class="input-group" id="youtube-input">
+                    <label for="youtube-url">YouTube Video URL</label>
+                    <div class="url-input-wrapper">
+                        <i class="fab fa-youtube"></i>
+                        <input type="url" id="youtube-url" placeholder="https://youtube.com/watch?v=..." />
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div class="input-group hidden" id="file-input">
+                    <label for="video-file">Upload Video File</label>
+                    <div class="file-upload-area" id="drop-zone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag & drop your video here or click to browse</p>
+                        <p class="file-info">Supported: MP4, MOV, WebM (Max 500MB)</p>
+                        <input type="file" id="video-file" accept=".mp4,.mov,.webm" hidden />
+                    </div>
+                    <div class="file-preview hidden" id="file-preview">
+                        <i class="fas fa-file-video"></i>
+                        <span id="file-name"></span>
+                        <button class="remove-file" id="remove-file">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section class="settings-section card">
+                <h2><i class="fas fa-cog"></i> Step 2: Configure Output</h2>
+                
+                <div class="settings-grid">
+                    <!-- Clip Settings -->
+                    <div class="setting-group">
+                        <label for="clip-duration">
+                            <i class="fas fa-clock"></i> Clip Duration
+                        </label>
+                        <select id="clip-duration">
+                            <option value="30">30 seconds</option>
+                            <option value="60" selected>60 seconds</option>
+                            <option value="90">90 seconds</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="num-clips">
+                            <i class="fas fa-list-ol"></i> Number of Clips
+                        </label>
+                        <input type="number" id="num-clips" min="1" max="10" value="3" />
+                    </div>
+
+                    <!-- Format Settings -->
+                    <div class="setting-group">
+                        <label for="aspect-ratio">
+                            <i class="fas fa-expand"></i> Aspect Ratio
+                        </label>
+                        <div class="aspect-ratio-options">
+                            <button class="aspect-btn active" data-ratio="9:16">
+                                <div class="aspect-icon vertical"></div>
+                                <span>9:16 Vertical</span>
+                            </button>
+                            <button class="aspect-btn" data-ratio="1:1">
+                                <div class="aspect-icon square"></div>
+                                <span>1:1 Square</span>
+                            </button>
+                            <button class="aspect-btn" data-ratio="16:9">
+                                <div class="aspect-icon horizontal"></div>
+                                <span>16:9 Horizontal</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label for="resolution">
+                            <i class="fas fa-tv"></i> Resolution
+                        </label>
+                        <select id="resolution">
+                            <option value="4K">4K Ultra HD (2160p)</option>
+                            <option value="1080p" selected>1080p HD</option>
+                            <option value="720p">720p</option>
+                            <option value="480p">480p</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Custom AI Prompt Section -->
+            <section class="custom-prompt-section card">
+                <h2><i class="fas fa-brain"></i> Step 3: AI Instructions (Optional)</h2>
+                
+                <div class="prompt-info">
+                    <p><i class="fas fa-info-circle"></i> Tell the AI exactly what to look for in your video. Leave blank for automatic selection of engaging moments.</p>
+                </div>
+                
+                <div class="prompt-examples">
+                    <span class="example-label">Examples:</span>
+                    <button class="prompt-example" data-prompt="all goals in this soccer match">Goals in match</button>
+                    <button class="prompt-example" data-prompt="funny moments and reactions">Funny moments</button>
+                    <button class="prompt-example" data-prompt="best plays and highlights">Best highlights</button>
+                    <button class="prompt-example" data-prompt="tutorial steps explained">Tutorial steps</button>
+                    <button class="prompt-example" data-prompt="key talking points">Key points</button>
+                </div>
+                
+                <div class="prompt-input-wrapper">
+                    <textarea id="custom-prompt" placeholder="e.g., 'Show all goals scored in this match' or 'Extract the funniest moments' or 'Find all product demonstrations'..." rows="3"></textarea>
+                    <button class="clear-prompt" id="clear-prompt" title="Clear prompt">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Generate Button -->
+            <section class="action-section">
+                <button class="generate-btn" id="generate-btn">
+                    <i class="fas fa-magic"></i>
+                    <span>Generate Clips with AI</span>
+                </button>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="progress-section card hidden" id="progress-section">
+                <h2><i class="fas fa-spinner fa-spin"></i> Processing Your Video</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <p class="progress-status" id="progress-status">Analyzing video with AI...</p>
+                <div class="progress-steps">
+                    <div class="step active" id="step-1">
+                        <i class="fas fa-brain"></i>
+                        <span>AI Analysis</span>
+                    </div>
+                    <div class="step" id="step-2">
+                        <i class="fas fa-cut"></i>
+                        <span>Extracting Clips</span>
+                    </div>
+                    <div class="step" id="step-3">
+                        <span>Formatting</span>
+                    </div>
+                    <div class="step" id="step-4">
+                        <i class="fas fa-check"></i>
+                        <span>Complete</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <section class="results-section card hidden" id="results-section">
+                <h2><i class="fas fa-film"></i> Your AI-Generated Clips</h2>
+                <div class="download-all-container">
+                    <button class="download-all-btn" id="download-all-btn">
+                        <i class="fas fa-download"></i>
+                        Download All as ZIP
+                    </button>
+                </div>
+
+                <div class="clips-grid" id="clips-grid">
+                    <!-- Clips will be inserted here dynamically -->
+                </div>
+
+                <button class="create-new-btn" id="create-new-btn">
+                    <i class="fas fa-plus"></i>
+                    Create More Clips
+                </button>
+            </section>
+
+            <!-- Error Section -->
+            <div class="error-message hidden" id="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="error-text"></span>
+                <button class="close-error" id="close-error">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by Gemini AI • Built with ❤️</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay hidden" id="loading-overlay">
+        <div class="loader"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        // Check for smart crop feature on page load
+        window.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/api/features');
+                const features = await response.json();
+                if (features.smart_crop === true) {
+                    document.getElementById('smart-crop-badge').style.display = 'block';
+                    console.log('✓ Smart crop with face tracking enabled');
+                }
+            } catch (error) {
+                console.log('Standard cropping mode');
+            }
+        });
+    </script>
+</body>
+</html>
