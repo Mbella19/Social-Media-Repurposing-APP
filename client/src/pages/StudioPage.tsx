@@ -8,6 +8,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Timeline } from "@/components/Timeline";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const parseTimestampToSeconds = (value: any): number => {
   if (value === null || value === undefined) return NaN;
@@ -30,8 +39,8 @@ const normalizeClipForStudio = (clip: any) => {
   const durationFromServer = Number(clip.duration);
   const computedDuration =
     Number.isFinite(startSeconds) &&
-    Number.isFinite(endSeconds) &&
-    endSeconds > startSeconds
+      Number.isFinite(endSeconds) &&
+      endSeconds > startSeconds
       ? endSeconds - startSeconds
       : NaN;
 
@@ -60,6 +69,13 @@ export default function StudioPage() {
   const [loading, setLoading] = useState(true);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [captionStyle, setCaptionStyle] = useState({
+    fontFamily: "Inter",
+    fontSize: 16,
+    color: "#FFFFFF",
+    backgroundColor: "#000000",
+    backgroundOpacity: 80
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -175,7 +191,7 @@ export default function StudioPage() {
       if (isPlaying) {
         video.pause();
       } else {
-        video.play().catch(() => {});
+        video.play().catch(() => { });
       }
       setIsPlaying(!isPlaying);
     }
@@ -282,13 +298,7 @@ export default function StudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          styleOptions: {
-            fontFamily: "Inter",
-            fontSize: 16,
-            color: "#FFFFFF",
-            backgroundColor: "#000000",
-            backgroundOpacity: 80
-          }
+          styleOptions: captionStyle
         })
       });
 
@@ -448,6 +458,15 @@ export default function StudioPage() {
                         <div className="absolute top-1 left-1 bg-black/50 px-1 text-[10px] font-mono text-white">
                           {i + 1}
                         </div>
+                        <a
+                          href={`/api/download/${sessionId}/${clip.filename}`}
+                          download
+                          className="absolute top-1 right-1 bg-black/50 p-1 text-white opacity-0 group-hover:opacity-100 hover:bg-cyan-400 hover:text-black transition-all"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Download Clip"
+                        >
+                          <Download className="h-3 w-3" />
+                        </a>
                       </div>
                       <div className="flex justify-between items-start">
                         <span className="text-xs font-bold text-zinc-300 truncate max-w-[120px]">{clip.description || `Clip ${i + 1}`}</span>
@@ -498,7 +517,7 @@ export default function StudioPage() {
                     className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer hover:bg-black/10 transition-colors"
                     onClick={togglePlay}
                   >
-                    <Play className="h-16 w-16 text-white opacity-80" />
+                    <Play className="h-16 w-16 text-white opacity-80 scale-110" />
                   </div>
                 )}
               </div>
@@ -578,6 +597,92 @@ export default function StudioPage() {
               {/* Captions */}
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-zinc-400 uppercase">Captions</Label>
+
+                {/* Caption Styles */}
+                <div className="space-y-3 p-3 border border-zinc-900 bg-zinc-900/30">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-zinc-500">Font Family</Label>
+                    <Select
+                      value={captionStyle.fontFamily}
+                      onValueChange={(val) => setCaptionStyle(prev => ({ ...prev, fontFamily: val }))}
+                      disabled={!selectedClip || !!processingAction}
+                    >
+                      <SelectTrigger className="h-7 text-xs bg-zinc-950 border-zinc-800">
+                        <SelectValue placeholder="Select font" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Inter">Inter</SelectItem>
+                        <SelectItem value="Roboto">Roboto</SelectItem>
+                        <SelectItem value="Arial">Arial</SelectItem>
+                        <SelectItem value="Courier New">Courier New</SelectItem>
+                        <SelectItem value="Georgia">Georgia</SelectItem>
+                        <SelectItem value="Impact">Impact</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <Label className="text-[10px] text-zinc-500">Font Size</Label>
+                      <span className="text-[10px] text-zinc-400">{captionStyle.fontSize}px</span>
+                    </div>
+                    <Slider
+                      value={[captionStyle.fontSize]}
+                      min={10}
+                      max={60}
+                      step={1}
+                      onValueChange={([val]) => setCaptionStyle(prev => ({ ...prev, fontSize: val }))}
+                      disabled={!selectedClip || !!processingAction}
+                      className="py-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-zinc-500">Text Color</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="color"
+                          value={captionStyle.color}
+                          onChange={(e) => setCaptionStyle(prev => ({ ...prev, color: e.target.value }))}
+                          className="h-6 w-8 p-0 border-zinc-800 bg-transparent cursor-pointer"
+                          disabled={!selectedClip || !!processingAction}
+                        />
+                        <span className="text-[10px] text-zinc-400 font-mono">{captionStyle.color}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-zinc-500">Bg Color</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="color"
+                          value={captionStyle.backgroundColor}
+                          onChange={(e) => setCaptionStyle(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                          className="h-6 w-8 p-0 border-zinc-800 bg-transparent cursor-pointer"
+                          disabled={!selectedClip || !!processingAction}
+                        />
+                        <span className="text-[10px] text-zinc-400 font-mono">{captionStyle.backgroundColor}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <Label className="text-[10px] text-zinc-500">Bg Opacity</Label>
+                      <span className="text-[10px] text-zinc-400">{captionStyle.backgroundOpacity}%</span>
+                    </div>
+                    <Slider
+                      value={[captionStyle.backgroundOpacity]}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onValueChange={([val]) => setCaptionStyle(prev => ({ ...prev, backgroundOpacity: val }))}
+                      disabled={!selectedClip || !!processingAction}
+                      className="py-1"
+                    />
+                  </div>
+                </div>
+
                 <Button
                   variant="outline"
                   className="w-full justify-start rounded-none border-zinc-800 hover:bg-zinc-900 hover:text-cyan-400"

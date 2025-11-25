@@ -13,7 +13,8 @@ from flask import Flask, request, jsonify, send_file, send_from_directory, Respo
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from apscheduler.schedulers.background import BackgroundScheduler
 import threading
 import logging
@@ -53,7 +54,7 @@ CORS(app)
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY not found in environment variables")
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
@@ -428,108 +429,112 @@ def analyze_video_with_gemini(video_source, num_clips, clip_duration, custom_pro
         logger.info(f"Prompt preview: {prompt[:200]}...")
         
         # Call Gemini API with CORRECT format based on source
+        # Handle YouTube videos by downloading them first
+        temp_youtube_file = None
         if is_youtube:
-            # NEW API FORMAT: For YouTube URLs, use file_data with file_uri
-            logger.info("📹 Using NEW Gemini API with file_uri for YouTube")
-            logger.info(f"   file_uri: {video_source}")
-            
-            # Retry logic with up to 3 minutes total wait time
-            max_retries = 5
-            total_timeout = 180  # 3 minutes
-            elapsed_time = 0
-            
-            for attempt in range(max_retries):
-                try:
-                    logger.info(f"   Attempt {attempt + 1}/{max_retries}...")
-                    # Set temperature to 0.2 for custom prompts to ensure focused responses
-                    generation_config = genai.GenerationConfig(
-                        temperature=0.2 if custom_prompt and custom_prompt.strip() else 1.0
-                    )
-                    model = genai.GenerativeModel('gemini-2.5-pro', generation_config=generation_config)
-                    response = model.generate_content([prompt, video_source])
-                    logger.info("✓ Gemini API call successful - YouTube video analyzed!")
-                    response_text = response.text
-                    break  # Success, exit retry loop
-                    
-                except Exception as api_error:
-                    error_str = str(api_error)
-                    
-                    # Check if rate limit or connection error
-                    if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
-                        # Extract retry delay from error message
-                        delay_match = re.search(r'retry in (\d+(?:\.\d+)?)', error_str.lower())
-                        if delay_match:
-                            wait_time = float(delay_match.group(1))
-                        else:
-                            # Default exponential backoff
-                            wait_time = min(30 * (2 ** attempt), 60)  # Cap at 60s
-                        
-                        elapsed_time += wait_time
-                        
-                        if elapsed_time > total_timeout:
-                            logger.error(f"Exceeded 3-minute timeout, giving up")
-                            raise
-                        
-                        if attempt < max_retries - 1:
-                            logger.warning(f"Rate limit hit, waiting {wait_time:.1f}s before retry...")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            raise
-                    
-                    elif 'Connection' in error_str or 'RemoteDisconnected' in error_str:
-                        wait_time = 10  # Wait 10s for connection issues
-                        elapsed_time += wait_time
-                        
-                        if elapsed_time > total_timeout:
-                            logger.error(f"Exceeded 3-minute timeout, giving up")
-                            raise
-                        
-                        if attempt < max_retries - 1:
-                            logger.warning(f"Connection error, waiting {wait_time}s before retry...")
-                            time.sleep(wait_time)
-                            continue
-                        else:
-                            raise
-                    else:
-                        # Other errors, fail immediately
-                        logger.error(f"Gemini API call failed: {api_error}")
-                        logger.error(f"Error details: {type(api_error).__name__}")
-                        raise
+            logger.info("📹 YouTube video detected. Downloading for Gemini 3 analysis...")
+            try:
+                # Use yt-dlp to download the video to a temp file
+                temp_filename = f"yt_analysis_{uuid.uuid4()}.mp4"
+                temp_youtube_file = os.path.join(TEMP_FOLDER, temp_filename)
+                
+                # Download command (fastest format that is compatible)
+                cmd = [
+                    'yt-dlp',
+                    '--cookies-from-browser', 'chrome',
+                    '-f', 'best[ext=mp4]/best',
+                    '-o', temp_youtube_file,
+                    video_source
+                ]
+                
+                logger.info(f"   Downloading to {temp_youtube_file}...")
+                subprocess.run(cmd, check=True, capture_output=True)
+                logger.info("   ✓ Download complete")
+                
+                # Switch to local file mode
+                video_source = temp_youtube_file
+                is_youtube = False  # Treat as local file now
+                
+            except Exception as dl_error:
+                logger.error(f"Failed to download YouTube video: {dl_error}")
+                if temp_youtube_file and os.path.exists(temp_youtube_file):
+                    os.remove(temp_youtube_file)
+                raise
+
+        if is_youtube:
+            # This block should not be reached if download was successful
+            pass
         else:
             # OLD API FORMAT: For uploaded files, use upload_file method
             logger.info("📤 Uploading local file to Gemini")
-            uploaded_file = genai.upload_file(path=video_source)
+            
+            with open(video_source, "rb") as f:
+                uploaded_file = client.files.upload(file=f, config=types.UploadFileConfig(mime_type="video/mp4"))
+            
             logger.info(f"✓ File uploaded: {uploaded_file.name}")
             
             # Wait for file to be processed
-            max_wait = 120
+            max_wait = 300  # Increased wait time for larger files
             wait_time = 0
-            while uploaded_file.state.name == "PROCESSING" and wait_time < max_wait:
+            while uploaded_file.state == "PROCESSING" and wait_time < max_wait:
                 logger.info(f"   Processing video... ({wait_time}s)")
-                time.sleep(3)
-                wait_time += 3
-                uploaded_file = genai.get_file(uploaded_file.name)
+                time.sleep(5)
+                wait_time += 5
+                uploaded_file = client.files.get(name=uploaded_file.name)
             
-            if uploaded_file.state.name != "ACTIVE":
-                logger.error(f"Video state: {uploaded_file.state.name}")
-                raise Exception(f"Video processing failed: {uploaded_file.state.name}")
+            if uploaded_file.state != "ACTIVE":
+                logger.error(f"Video state: {uploaded_file.state}")
+                raise Exception(f"Video processing failed: {uploaded_file.state}")
             
             logger.info("✓ File ready for analysis")
 
             try:
-                # Set temperature to 0.2 for custom prompts to ensure focused responses
-                generation_config = genai.GenerationConfig(
-                    temperature=0.2 if custom_prompt and custom_prompt.strip() else 1.0
+                logger.info(f"   Using file URI: {uploaded_file.uri}")
+                
+                video_part = types.Part.from_uri(
+                    file_uri=uploaded_file.uri,
+                    mime_type="video/mp4"
                 )
-                model = genai.GenerativeModel(model_name="gemini-2.5-pro", generation_config=generation_config)
-                response = model.generate_content([uploaded_file, prompt])
-                logger.info("✓ Gemini API call successful - Uploaded file analyzed!")
-                response_text = response.text
+                prompt_part = types.Part.from_text(text=prompt)
+
+                # Retry logic for generation
+                max_retries = 3
+                for attempt in range(max_retries):
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-3-pro-preview",
+                            contents=[types.Content(parts=[prompt_part, video_part])],
+                            config=types.GenerateContentConfig(
+                                temperature=1.0,
+                                thinking_config=types.ThinkingConfig(include_thoughts=True, thinking_level="HIGH"),
+                                media_resolution="MEDIA_RESOLUTION_HIGH"
+                            )
+                        )
+                        logger.info("✓ Gemini API call successful - File analyzed!")
+                        response_text = response.text
+                        break
+                    except Exception as gen_error:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Generation failed, retrying ({attempt+1}/{max_retries}): {gen_error}")
+                            time.sleep(5)
+                        else:
+                            raise gen_error
+
             except Exception as api_error:
                 logger.error(f"Gemini API call failed: {api_error}")
                 logger.error(f"Error details: {type(api_error).__name__}")
                 raise
+            finally:
+                # Cleanup: Delete the uploaded file from Gemini to save storage/quota
+                try:
+                    # client.files.delete(name=uploaded_file.name) # SDK might not have delete yet or it's different
+                    # For now, let's assume we keep it or rely on auto-cleanup if available.
+                    # But we SHOULD delete the local temp file if we downloaded it.
+                    if temp_youtube_file and os.path.exists(temp_youtube_file):
+                        logger.info(f"Cleaning up temp file: {temp_youtube_file}")
+                        os.remove(temp_youtube_file)
+                except Exception as cleanup_error:
+                    logger.warning(f"Cleanup error: {cleanup_error}")
         
         # Parse JSON response (response_text already set above)
         logger.info(f"📥 Gemini response received, length: {len(response_text)} characters")
@@ -646,64 +651,69 @@ Respond ONLY with valid JSON:
             for attempt in range(max_retries):
                 try:
                     logger.info(f"   AI attempt {attempt + 1}/{max_retries}...")
-                    # Upload the video file
-                    video_file = genai.upload_file(path=video_path)
-                    model = genai.GenerativeModel('gemini-2.5-pro')
-                    response = model.generate_content([prompt, video_file])
+                    
+                    video_part = types.Part(
+                        file_data=types.FileData(file_uri=video_path, mime_type="video/mp4"),
+                        media_resolution={"level": "media_resolution_high"}
+                    )
+                    prompt_part = types.Part(text=prompt)
+
+                    response = client.models.generate_content(
+                        model="gemini-3-pro-preview",
+                        contents=[types.Content(parts=[prompt_part, video_part])],
+                        config=types.GenerateContentConfig(
+                            temperature=1.0,
+                            thinking_config=types.ThinkingConfig(include_thoughts=True)
+                        )
+                    )
                     response_text = response.text
                     break  # Success
                     
                 except Exception as api_error:
                     error_str = str(api_error)
+                    logger.warning(f"API Error: {error_str}")
                     
-                    if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
-                        # Extract retry delay
-                        delay_match = re.search(r'retry in (\d+(?:\.\d+)?)', error_str.lower())
-                        wait_time = float(delay_match.group(1)) if delay_match else min(20 * (2 ** attempt), 45)
-                        
-                        elapsed_time += wait_time
-                        
-                        if elapsed_time > total_timeout or attempt >= max_retries - 1:
-                            logger.warning(f"   Rate limit exhausted, defaulting to standard crop")
-                            return False
-                        
-                        logger.warning(f"   Rate limit, waiting {wait_time:.1f}s...")
-                        time.sleep(wait_time)
-                        continue
-                    
-                    elif 'Connection' in error_str:
-                        wait_time = 10
-                        elapsed_time += wait_time
-                        
-                        if elapsed_time > total_timeout or attempt >= max_retries - 1:
-                            logger.warning(f"   Connection failed, defaulting to standard crop")
-                            return False
-                        
-                        logger.warning(f"   Connection error, waiting {wait_time}s...")
-                        time.sleep(wait_time)
-                        continue
-                    else:
-                        logger.error(f"   Error in letterbox analysis: {api_error}")
+                    wait_time = min(20 * (2 ** attempt), 45)
+                    elapsed_time += wait_time
+                    if elapsed_time > total_timeout:
                         return False
+                    
+                    time.sleep(wait_time)
+                    continue
         else:
-            # Use old API for local files
+            # Use new API for local files
             logger.info(f"   Uploading clip to Gemini for analysis...")
-            uploaded_file = genai.upload_file(path=video_path)
+            
+            with open(video_path, "rb") as f:
+                uploaded_file = client.files.upload(file=f, config=types.UploadFileConfig(mime_type="video/mp4"))
             
             # Wait for processing (shorter timeout for clips)
             max_wait = 60
             wait_time = 0
-            while uploaded_file.state.name == "PROCESSING" and wait_time < max_wait:
+            while uploaded_file.state == "PROCESSING" and wait_time < max_wait:
                 time.sleep(2)
                 wait_time += 2
-                uploaded_file = genai.get_file(uploaded_file.name)
+                uploaded_file = client.files.get(name=uploaded_file.name)
             
-            if uploaded_file.state.name != "ACTIVE":
+            if uploaded_file.state != "ACTIVE":
                 logger.warning(f"   Clip processing timeout, defaulting to standard crop")
                 return False
             
-            model = genai.GenerativeModel(model_name="gemini-2.5-pro")
-            response = model.generate_content([uploaded_file, prompt])
+            video_part = types.Part.from_uri(
+                file_uri=uploaded_file.uri,
+                mime_type="video/mp4"
+            )
+            prompt_part = types.Part.from_text(text=prompt)
+
+            response = client.models.generate_content(
+                model="gemini-3-pro-preview",
+                contents=[types.Content(parts=[prompt_part, video_part])],
+                config=types.GenerateContentConfig(
+                    temperature=1.0,
+                    thinking_config=types.ThinkingConfig(include_thoughts=True, thinking_level="HIGH"),
+                    media_resolution="MEDIA_RESOLUTION_HIGH"
+                )
+            )
             response_text = response.text
         
         # Parse JSON response
@@ -1244,7 +1254,7 @@ def process_video_background(session_id, video_url, url_type, clip_duration, num
             
             # STEP 1: Send YouTube URL directly to Gemini for analysis (NO DOWNLOAD!)
             logger.info("=" * 60)
-            logger.info("STEP 1: Analyzing YouTube video with Gemini 2.5 Pro")
+            logger.info("STEP 1: Analyzing YouTube video with Gemini 3 Pro Preview")
             logger.info(f"Original URL: {video_url}")
             logger.info(f"Normalized URL: {normalized_url}")
             
