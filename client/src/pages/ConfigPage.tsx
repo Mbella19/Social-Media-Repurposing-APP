@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowRight, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ConfigPage() {
@@ -101,6 +100,30 @@ export default function ConfigPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-4">
+              <Label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Clip Duration</Label>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="h-12 rounded-none bg-zinc-900 border-zinc-800 text-white focus:ring-cyan-400/50">
+                  <SelectValue placeholder="Clip length" />
+                </SelectTrigger>
+                <SelectContent className="rounded-none border-zinc-800 bg-zinc-950 text-white">
+                  <SelectItem value="auto">Auto (AI decides)</SelectItem>
+                  <SelectItem value="15">15 seconds</SelectItem>
+                  <SelectItem value="30">30 seconds</SelectItem>
+                  <SelectItem value="45">45 seconds</SelectItem>
+                  <SelectItem value="60">60 seconds</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-4">
+              <Label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Smart Crop</Label>
+              <div className="flex items-center justify-between h-12 px-4 bg-zinc-900 border border-zinc-800">
+                <span className="text-sm text-zinc-300">AI-powered subject tracking</span>
+                <Switch checked={smartCrop} onCheckedChange={setSmartCrop} />
+              </div>
+            </div>
           </div>
 
           {/* AI Prompt */}
@@ -131,6 +154,14 @@ export default function ConfigPage() {
               <div className="flex justify-between border-b border-zinc-800 pb-2">
                 <span className="text-zinc-500 font-bold uppercase tracking-wider">Clips</span>
                 <span className="font-mono text-white">{clipCount === "auto" ? "AI" : clipCount}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-800 pb-2">
+                <span className="text-zinc-500 font-bold uppercase tracking-wider">Duration</span>
+                <span className="font-mono text-white">{duration === "auto" ? "AI" : `${duration}s`}</span>
+              </div>
+              <div className="flex justify-between border-b border-zinc-800 pb-2">
+                <span className="text-zinc-500 font-bold uppercase tracking-wider">Smart Crop</span>
+                <span className="font-mono text-white">{smartCrop ? "On" : "Off"}</span>
               </div>
             </dl>
 

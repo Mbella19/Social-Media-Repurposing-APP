@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Youtube, FileVideo } from "lucide-react";
+import { Upload } from "lucide-react";
 
 export default function UploadPage() {
   const [, setLocation] = useLocation();
@@ -93,7 +93,18 @@ export default function UploadPage() {
               onDrop={(e) => {
                 e.preventDefault();
                 setIsDragging(false);
-                // Handle drop
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith('video/')) {
+                  sessionStorage.setItem("videoUrl", URL.createObjectURL(file));
+                  sessionStorage.setItem("videoType", "file");
+                  setLocation("/configure");
+                } else if (file) {
+                  toast({
+                    title: "Invalid File",
+                    description: "Please drop a video file",
+                    variant: "destructive"
+                  });
+                }
               }}
             >
               <input
